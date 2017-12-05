@@ -120,6 +120,9 @@ case "$1" in
                 -out /var/lib/prosody/$JVB_HOSTNAME.crt
             ln -sf /var/lib/prosody/$JVB_HOSTNAME.key /etc/prosody/certs/$JVB_HOSTNAME.key
             ln -sf /var/lib/prosody/$JVB_HOSTNAME.crt /etc/prosody/certs/$JVB_HOSTNAME.crt
+
+            chown prosody:prosody /var/lib/prosody/$JVB_HOSTNAME.key
+            chown prosody:prosody /var/lib/prosody/$JVB_HOSTNAME.crt
         fi
 
         if [ ! -f /var/lib/prosody/$JICOFO_AUTH_DOMAIN.crt ]; then
@@ -129,6 +132,9 @@ case "$1" in
                 "/O=$DOMAIN/OU=$HOST/CN=$JICOFO_AUTH_DOMAIN/emailAddress=webmaster@$HOST.$DOMAIN" \
                 -keyout /var/lib/prosody/$JICOFO_AUTH_DOMAIN.key \
                 -out /var/lib/prosody/$JICOFO_AUTH_DOMAIN.crt
+
+            chown prosody:prosody /var/lib/prosody/$JICOFO_AUTH_DOMAIN.key
+            chown prosody:prosody /var/lib/prosody/$JICOFO_AUTH_DOMAIN.crt
 
             AUTH_KEY_FILE="/etc/prosody/certs/$JICOFO_AUTH_DOMAIN.key"
             AUTH_CRT_FILE="/etc/prosody/certs/$JICOFO_AUTH_DOMAIN.crt"
