@@ -1,11 +1,15 @@
 /* global $, APP, interfaceConfig */
 
-import { setFilmstripVisibility } from '../../../react/features/filmstrip';
+import { setFilmstripVisible } from '../../../react/features/filmstrip';
 
 import UIEvents from '../../../service/UI/UIEvents';
 import UIUtil from '../util/UIUtil';
 
-import { sendAnalyticsEvent } from '../../../react/features/analytics';
+import {
+    createShortcutEvent,
+    createToolbarEvent,
+    sendAnalytics
+} from '../../../react/features/analytics';
 
 const Filmstrip = {
     /**
@@ -72,8 +76,18 @@ const Filmstrip = {
         // Firing the event instead of executing toggleFilmstrip method because
         // it's important to hide the filmstrip by UI.toggleFilmstrip in order
         // to correctly resize the video area.
-        $('#toggleFilmstripButton').on('click',
-            () => this.eventEmitter.emit(UIEvents.TOGGLE_FILMSTRIP));
+        $('#toggleFilmstripButton').on(
+            'click',
+            () => {
+                // The 'enable' parameter is set to true if the action results
+                // in the filmstrip being hidden.
+                sendAnalytics(createToolbarEvent(
+                    'toggle.filmstrip.button',
+                    {
+                        enable: this.isFilmstripVisible()
+                    }));
+                this.eventEmitter.emit(UIEvents.TOGGLE_FILMSTRIP);
+            });
 
         this._registerToggleFilmstripShortcut();
     },
@@ -91,7 +105,14 @@ const Filmstrip = {
         // Firing the event instead of executing toggleFilmstrip method because
         // it's important to hide the filmstrip by UI.toggleFilmstrip in order
         // to correctly resize the video area.
-        const handler = () => this.eventEmitter.emit(UIEvents.TOGGLE_FILMSTRIP);
+        const handler = () => {
+            sendAnalytics(createShortcutEvent(
+                'toggle.filmstrip',
+                {
+                    enable: this.isFilmstripVisible()
+                }));
+            this.eventEmitter.emit(UIEvents.TOGGLE_FILMSTRIP);
+        };
 
         APP.keyboardshortcut.registerShortcut(
             shortcut,
@@ -126,50 +147,43 @@ const Filmstrip = {
     },
 
     /**
-     * Toggles the visibility of the filmstrip.
+     * Toggles the visibility of the filmstrip, or sets it to a specific value
+     * if the 'visible' parameter is specified.
      *
      * @param visible optional {Boolean} which specifies the desired visibility
      * of the filmstrip. If not specified, the visibility will be flipped
      * (i.e. toggled); otherwise, the visibility will be set to the specified
      * value.
-     * @param {Boolean} sendAnalytics - True to send an analytics event. The
-     * default value is true.
      *
      * Note:
      * This method shouldn't be executed directly to hide the filmstrip.
      * It's important to hide the filmstrip with UI.toggleFilmstrip in order
      * to correctly resize the video area.
      */
-    toggleFilmstrip(visible, sendAnalytics = true) {
-        const isVisibleDefined = typeof visible === 'boolean';
+    toggleFilmstrip(visible) {
+        const wasFilmstripVisible = this.isFilmstripVisible();
 
-        if (!isVisibleDefined) {
-            // eslint-disable-next-line no-param-reassign
-            visible = this.isFilmstripVisible();
-        } else if (this.isFilmstripVisible() === visible) {
+        // If 'visible' is defined and matches the current state, we have
+        // nothing to do. Otherwise (regardless of whether 'visible' is defined)
+        // we need to toggle the state.
+        if (visible === wasFilmstripVisible) {
             return;
         }
-        if (sendAnalytics) {
-            sendAnalyticsEvent('toolbar.filmstrip.toggled');
-        }
+
         this.filmstrip.toggleClass('hidden');
 
-        if (visible) {
+        if (wasFilmstripVisible) {
             this.showMenuUpIcon();
         } else {
             this.showMenuDownIcon();
         }
 
-        // Emit/fire UIEvents.TOGGLED_FILMSTRIP.
-        const eventEmitter = this.eventEmitter;
-        const isFilmstripVisible = this.isFilmstripVisible();
-
-        if (eventEmitter) {
-            eventEmitter.emit(
+        if (this.eventEmitter) {
+            this.eventEmitter.emit(
                 UIEvents.TOGGLED_FILMSTRIP,
-                this.isFilmstripVisible());
+                !wasFilmstripVisible);
         }
-        APP.store.dispatch(setFilmstripVisibility(isFilmstripVisible));
+        APP.store.dispatch(setFilmstripVisible(!wasFilmstripVisible));
     },
 
     /**
@@ -200,7 +214,18 @@ const Filmstrip = {
         }
 
         return 0;
+    },
 
+    /**
+     * Returns the width of filmstip
+     * @returns {number} width
+     */
+    getFilmstripWidth() {
+        return this.isFilmstripVisible()
+            ? this.filmstrip.outerWidth()
+                - parseInt(this.filmstrip.css('paddingLeft'), 10)
+                - parseInt(this.filmstrip.css('paddingRight'), 10)
+            : 0;
     },
 
     /**
@@ -413,85 +438,54 @@ const Filmstrip = {
      * Resizes thumbnails
      * @param local
      * @param remote
-     * @param animate
      * @param forceUpdate
      * @returns {Promise}
      */
     // eslint-disable-next-line max-params
-    resizeThumbnails(local, remote, animate = false, forceUpdate = false) {
-        return new Promise(resolve => {
-            const thumbs = this.getThumbs(!forceUpdate);
-            const promises = [];
+    resizeThumbnails(local, remote, forceUpdate = false) {
+        const thumbs = this.getThumbs(!forceUpdate);
 
-            if (thumbs.localThumb) {
-                // eslint-disable-next-line no-shadow
-                promises.push(new Promise(resolve => {
-                    thumbs.localThumb.animate({
-                        height: local.thumbHeight,
-                        'min-height': local.thumbHeight,
-                        'min-width': local.thumbWidth,
-                        width: local.thumbWidth
-                    }, this._getAnimateOptions(animate, resolve));
-                }));
-            }
-            if (thumbs.remoteThumbs) {
-                // eslint-disable-next-line no-shadow
-                promises.push(new Promise(resolve => {
-                    thumbs.remoteThumbs.animate({
-                        height: remote.thumbHeight,
-                        'min-height': remote.thumbHeight,
-                        'min-width': remote.thumbWidth,
-                        width: remote.thumbWidth
-                    }, this._getAnimateOptions(animate, resolve));
-                }));
-            }
+        if (thumbs.localThumb) {
             // eslint-disable-next-line no-shadow
-            promises.push(new Promise(resolve => {
-                // Let CSS take care of height in vertical filmstrip mode.
-                if (interfaceConfig.VERTICAL_FILMSTRIP) {
-                    $('#filmstripLocalVideo').animate({
-                        // adds 4 px because of small video 2px border
-                        width: local.thumbWidth + 4
-                    }, this._getAnimateOptions(animate, resolve));
-                } else {
-                    this.filmstrip.animate({
-                        // adds 4 px because of small video 2px border
-                        height: remote.thumbHeight + 4
-                    }, this._getAnimateOptions(animate, resolve));
-                }
-            }));
+            thumbs.localThumb.css({
+                display: 'inline-block',
+                height: `${local.thumbHeight}px`,
+                'min-height': `${local.thumbHeight}px`,
+                'min-width': `${local.thumbWidth}px`,
+                width: `${local.thumbWidth}px`
+            });
+        }
 
-            promises.push(new Promise(() => {
-                const { localThumb } = this.getThumbs();
-                const height = localThumb ? localThumb.height() : 0;
-                const fontSize = UIUtil.getIndicatorFontSize(height);
+        if (thumbs.remoteThumbs) {
+            thumbs.remoteThumbs.css({
+                display: 'inline-block',
+                height: `${remote.thumbHeight}px`,
+                'min-height': `${remote.thumbHeight}px`,
+                'min-width': `${remote.thumbWidth}px`,
+                width: `${remote.thumbWidth}px`
+            });
+        }
 
-                this.filmstrip.find('.indicator').animate({
-                    fontSize
-                }, this._getAnimateOptions(animate, resolve));
-            }));
+        // Let CSS take care of height in vertical filmstrip mode.
+        if (interfaceConfig.VERTICAL_FILMSTRIP) {
+            $('#filmstripLocalVideo').css({
+                // adds 4 px because of small video 2px border
+                width: `${local.thumbWidth + 4}px`
+            });
+        } else {
+            this.filmstrip.css({
+                // adds 4 px because of small video 2px border
+                height: `${remote.thumbHeight + 4}px`
+            });
+        }
 
-            if (!animate) {
-                resolve();
-            }
+        const { localThumb } = this.getThumbs();
+        const height = localThumb ? localThumb.height() : 0;
+        const fontSize = UIUtil.getIndicatorFontSize(height);
 
-            Promise.all(promises).then(resolve);
+        this.filmstrip.find('.indicator').css({
+            'font-size': `${fontSize}px`
         });
-    },
-
-    /**
-     * Helper method. Returns options for jQuery animation
-     * @param animate {Boolean} - animation flag
-     * @param cb {Function} - complete callback
-     * @returns {Object} - animation options object
-     * @private
-     */
-    _getAnimateOptions(animate, cb = $.noop) {
-        return {
-            queue: false,
-            duration: animate ? 500 : 0,
-            complete: cb
-        };
     },
 
     /**

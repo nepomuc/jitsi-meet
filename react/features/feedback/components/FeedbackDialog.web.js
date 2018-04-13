@@ -1,12 +1,16 @@
 /* global interfaceConfig */
 
+import { FieldTextAreaStateless } from '@atlaskit/field-text-area';
 import StarIcon from '@atlaskit/icon/glyph/star';
 import StarFilledIcon from '@atlaskit/icon/glyph/star-filled';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 
-import { sendAnalyticsEvent } from '../../analytics';
+import {
+    createFeedbackOpenEvent,
+    sendAnalytics
+} from '../../analytics';
 import { Dialog } from '../../base/dialog';
 import { translate } from '../../base/i18n';
 
@@ -145,7 +149,7 @@ class FeedbackDialog extends Component {
      * @inheritdoc
      */
     componentDidMount() {
-        sendAnalyticsEvent('feedback.open');
+        sendAnalytics(createFeedbackOpenEvent());
     }
 
     /**
@@ -216,12 +220,13 @@ class FeedbackDialog extends Component {
                         </div>
                     </div>
                     <div className = 'details'>
-                        <textarea
+                        <FieldTextAreaStateless
                             autoFocus = { true }
                             className = 'input-control'
                             id = 'feedbackTextArea'
+                            label = { t('feedback.detailsLabel') }
                             onChange = { this._onMessageChange }
-                            placeholder = { t('dialog.feedbackHelp') }
+                            shouldFitContainer = { true }
                             value = { message } />
                     </div>
                 </div>

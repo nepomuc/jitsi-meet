@@ -1,44 +1,69 @@
-/* @flow */
+// @flow
 
 import _ from 'lodash';
-import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect as reactReduxConnect } from 'react-redux';
 
 import { connect, disconnect } from '../../base/connection';
 import { DialogContainer } from '../../base/dialog';
+import { translate } from '../../base/i18n';
+import { CalleeInfoContainer } from '../../base/jwt';
 import { Filmstrip } from '../../filmstrip';
 import { LargeVideo } from '../../large-video';
 import { NotificationsContainer } from '../../notifications';
-import { OverlayContainer } from '../../overlay';
-import { showToolbox, Toolbox } from '../../toolbox';
+import { SidePanel } from '../../side-panel';
+import {
+    Toolbox,
+    fullScreenChanged,
+    setToolboxAlwaysVisible,
+    showToolbox
+} from '../../toolbox';
 import { HideNotificationBarStyle } from '../../unsupported-browser';
 
-declare var $: Function;
+import { maybeShowSuboptimalExperienceNotification } from '../functions';
+
 declare var APP: Object;
 declare var interfaceConfig: Object;
 
 /**
- * The conference page of the Web application.
+ * DOM events for when full screen mode has changed. Different browsers need
+ * different vendor prefixes.
+ *
+ * @private
+ * @type {Array<string>}
  */
-class Conference extends Component<*> {
-    _onShowToolbar: Function;
-    _originalOnShowToolbar: Function;
+const FULL_SCREEN_EVENTS = [
+    'webkitfullscreenchange',
+    'mozfullscreenchange',
+    'fullscreenchange'
+];
+
+/**
+ * The type of the React {@code Component} props of {@link Conference}.
+ */
+type Props = {
 
     /**
-     * Conference component's property types.
-     *
-     * @static
+     * Whether the toolbar should stay visible or be able to autohide.
      */
-    static propTypes = {
-        /**
-         * Whether or not the current local user is recording the conference.
-         *
-         */
-        _isRecording: PropTypes.bool,
+    _alwaysVisibleToolbar: boolean,
 
-        dispatch: PropTypes.func
-    };
+    /**
+     * Whether the local participant is recording the conference.
+     */
+    _iAmRecorder: boolean,
+
+    dispatch: Function,
+    t: Function
+}
+
+/**
+ * The conference page of the Web application.
+ */
+class Conference extends Component<Props> {
+    _onFullScreenChange: Function;
+    _onShowToolbar: Function;
+    _originalOnShowToolbar: Function;
 
     /**
      * Initializes a new Conference instance.
@@ -59,6 +84,9 @@ class Conference extends Component<*> {
                 leading: true,
                 trailing: false
             });
+
+        // Bind event handler so it is only bound once for every instance.
+        this._onFullScreenChange = this._onFullScreenChange.bind(this);
     }
 
     /**
@@ -74,7 +102,16 @@ class Conference extends Component<*> {
         APP.UI.registerListeners();
         APP.UI.bindEvents();
 
-        this.props.dispatch(connect());
+        FULL_SCREEN_EVENTS.forEach(name =>
+            document.addEventListener(name, this._onFullScreenChange));
+
+        const { _alwaysVisibleToolbar, dispatch, t } = this.props;
+
+        dispatch(connect());
+        maybeShowSuboptimalExperienceNotification(dispatch, t);
+
+        dispatch(setToolboxAlwaysVisible(
+            _alwaysVisibleToolbar || interfaceConfig.filmStripOnly));
     }
 
     /**
@@ -84,9 +121,11 @@ class Conference extends Component<*> {
      * @inheritdoc
      */
     componentWillUnmount() {
-        APP.UI.stopDaemons();
         APP.UI.unregisterListeners();
         APP.UI.unbindEvents();
+
+        FULL_SCREEN_EVENTS.forEach(name =>
+            document.removeEventListener(name, this._onFullScreenChange));
 
         APP.conference.isJoined() && this.props.dispatch(disconnect());
     }
@@ -98,10 +137,14 @@ class Conference extends Component<*> {
      * @returns {ReactElement}
      */
     render() {
-        const { filmStripOnly, VIDEO_QUALITY_LABEL_DISABLED } = interfaceConfig;
-        const hideVideoQualityLabel = filmStripOnly
-            || VIDEO_QUALITY_LABEL_DISABLED
-            || this.props._isRecording;
+        const {
+            VIDEO_QUALITY_LABEL_DISABLED,
+            filmStripOnly
+        } = interfaceConfig;
+        const hideVideoQualityLabel
+            = filmStripOnly
+                || VIDEO_QUALITY_LABEL_DISABLED
+                || this.props._iAmRecorder;
 
         return (
             <div
@@ -113,11 +156,13 @@ class Conference extends Component<*> {
                     <Filmstrip filmstripOnly = { filmStripOnly } />
                 </div>
 
-                { filmStripOnly ? null : <Toolbox /> }
+                { !filmStripOnly && <Toolbox /> }
+                { !filmStripOnly && <SidePanel /> }
 
                 <DialogContainer />
                 <NotificationsContainer />
-                <OverlayContainer />
+
+                <CalleeInfoContainer />
 
                 {/*
                   * Temasys automatically injects a notification bar, if
@@ -129,6 +174,17 @@ class Conference extends Component<*> {
                 <HideNotificationBarStyle />
             </div>
         );
+    }
+
+    /**
+     * Updates the Redux state when full screen mode has been enabled or
+     * disabled.
+     *
+     * @private
+     * @returns {void}
+     */
+    _onFullScreenChange() {
+        this.props.dispatch(fullScreenChanged(APP.UI.isFullScreen()));
     }
 
     /**
@@ -149,13 +205,31 @@ class Conference extends Component<*> {
  * @param {Object} state - The Redux state.
  * @private
  * @returns {{
- *     _isRecording: boolean
+ *     _alwaysVisibleToolbar: boolean,
+ *     _iAmRecorder: boolean
  * }}
  */
 function _mapStateToProps(state) {
+    const {
+        alwaysVisibleToolbar,
+        iAmRecorder
+    } = state['features/base/config'];
+
     return {
-        _isRecording: state['features/base/config'].iAmRecorder
+        /**
+         * Whether the toolbar should stay visible or be able to autohide.
+         *
+         * @private
+         */
+        _alwaysVisibleToolbar: alwaysVisibleToolbar,
+
+        /**
+         * Whether the local participant is recording the conference.
+         *
+         * @private
+         */
+        _iAmRecorder: iAmRecorder
     };
 }
 
-export default reactReduxConnect(_mapStateToProps)(Conference);
+export default reactReduxConnect(_mapStateToProps)(translate(Conference));

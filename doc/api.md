@@ -27,6 +27,7 @@ Its constructor gets a number of options:
     * **interfaceConfigOverwrite**: (optional) JS object with overrides for options defined in [interface_config.js].
     * **noSSL**: (optional, defaults to true) Boolean indicating if the server should be contacted using HTTP or HTTPS.
     * **jwt**: (optional) [JWT](https://jwt.io/) token.
+    * **onload**: (optional) handler for the iframe onload event.
 
 Example:
 
@@ -96,11 +97,6 @@ api.executeCommand('toggleFilmStrip')
 api.executeCommand('toggleChat')
 ```
 
-* **toggleContactList** - Hides / shows the contact list. No arguments are required.
-```javascript
-api.executeCommand('toggleContactList')
-```
-
 * **toggleShareScreen** - Starts / stops screen sharing. No arguments are required.
 ```javascript
 api.executeCommand('toggleShareScreen')
@@ -160,6 +156,13 @@ changes. The listener will receive an object with the following structure:
 ```javascript
 {
 "muted": muted // new muted status - boolean
+}
+```
+
+* **screenSharingStatusChanged** - receives event notifications about turning on/off the local user screen sharing. The listener will receive object with the following structure:
+```javascript
+{
+"on": on //whether screen sharing is on
 }
 ```
 

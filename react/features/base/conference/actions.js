@@ -2,11 +2,15 @@
 
 import UIEvents from '../../../../service/UI/UIEvents';
 
-import { sendAnalyticsEvent } from '../../analytics';
+import {
+    createStartMutedConfigurationEvent,
+    sendAnalytics
+} from '../../analytics';
 import { getName } from '../../app';
 import { JitsiConferenceEvents } from '../lib-jitsi-meet';
 import { setAudioMuted, setVideoMuted } from '../media';
 import {
+    MAX_DISPLAY_NAME_LENGTH,
     dominantSpeakerChanged,
     participantConnectionStatusChanged,
     participantJoined,
@@ -15,6 +19,7 @@ import {
     participantUpdated
 } from '../participants';
 import { getLocalTracks, trackAdded, trackRemoved } from '../tracks';
+import { getJitsiMeetGlobalNS } from '../util';
 
 import {
     CONFERENCE_FAILED,
@@ -23,9 +28,11 @@ import {
     CONFERENCE_WILL_JOIN,
     CONFERENCE_WILL_LEAVE,
     DATA_CHANNEL_OPENED,
+    KICKED_OUT,
     LOCK_STATE_CHANGED,
     P2P_STATUS_CHANGED,
     SET_AUDIO_ONLY,
+    SET_DESKTOP_SHARING_ENABLED,
     SET_FOLLOW_ME,
     SET_LASTN,
     SET_PASSWORD,
@@ -73,6 +80,10 @@ function _addConferenceListeners(conference, dispatch) {
         (...args) => dispatch(conferenceLeft(conference, ...args)));
 
     conference.on(
+        JitsiConferenceEvents.KICKED,
+        () => dispatch(kickedOut(conference)));
+
+    conference.on(
         JitsiConferenceEvents.LOCK_STATE_CHANGED,
         (...args) => dispatch(lockStateChanged(conference, ...args)));
 
@@ -84,10 +95,8 @@ function _addConferenceListeners(conference, dispatch) {
             const audioMuted = Boolean(conference.startAudioMuted);
             const videoMuted = Boolean(conference.startVideoMuted);
 
-            sendAnalyticsEvent(
-                `startmuted.server.audio.${audioMuted ? 'muted' : 'unmuted'}`);
-            sendAnalyticsEvent(
-                `startmuted.server.video.${videoMuted ? 'muted' : 'unmuted'}`);
+            sendAnalytics(createStartMutedConfigurationEvent(
+                'remote', audioMuted, videoMuted));
             logger.log(`Start muted: ${audioMuted ? 'audio, ' : ''}${
                 videoMuted ? 'video' : ''}`);
 
@@ -113,6 +122,12 @@ function _addConferenceListeners(conference, dispatch) {
         t => t && !t.isLocal() && dispatch(trackRemoved(t)));
 
     // Dispatches into features/base/participants follow:
+    conference.on(
+        JitsiConferenceEvents.DISPLAY_NAME_CHANGED,
+        (id, displayName) => dispatch(participantUpdated({
+            id,
+            name: displayName.substr(0, MAX_DISPLAY_NAME_LENGTH)
+        })));
 
     conference.on(
         JitsiConferenceEvents.DOMINANT_SPEAKER_CHANGED,
@@ -303,7 +318,8 @@ export function createConference() {
                 // XXX Lib-jitsi-meet does not accept uppercase letters.
                 room.toLowerCase(), {
                     ...state['features/base/config'],
-                    applicationName: getName()
+                    applicationName: getName(),
+                    getWiFiStatsMethod: getJitsiMeetGlobalNS().getWiFiStats
                 });
 
         conference[JITSI_CONFERENCE_URL_KEY] = locationURL;
@@ -344,6 +360,23 @@ export function checkIfCanJoin() {
 export function dataChannelOpened() {
     return {
         type: DATA_CHANNEL_OPENED
+    };
+}
+
+/**
+ * Signals that we've been kicked out of the conference.
+ *
+ * @param {JitsiConference} conference - The {@link JitsiConference} instance
+ * for which the event is being signaled.
+ * @returns {{
+ *     type: KICKED_OUT,
+ *     conference: JitsiConference
+ * }}
+ */
+export function kickedOut(conference: Object) {
+    return {
+        type: KICKED_OUT,
+        conference
     };
 }
 
@@ -420,6 +453,22 @@ export function setAudioOnly(audioOnly: boolean) {
     return {
         type: SET_AUDIO_ONLY,
         audioOnly
+    };
+}
+
+/**
+ * Sets the flag for indicating if desktop sharing is enabled.
+ *
+ * @param {boolean} desktopSharingEnabled - True if desktop sharing is enabled.
+ * @returns {{
+ *     type: SET_DESKTOP_SHARING_ENABLED,
+ *     desktopSharingEnabled: boolean
+ * }}
+ */
+export function setDesktopSharingEnabled(desktopSharingEnabled: boolean) {
+    return {
+        type: SET_DESKTOP_SHARING_ENABLED,
+        desktopSharingEnabled
     };
 }
 

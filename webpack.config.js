@@ -4,8 +4,6 @@ const process = require('process');
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 const webpack = require('webpack');
 
-const auiCSS = `${__dirname}/node_modules/@atlassian/aui/dist/aui/css/`;
-
 /**
  * The URL of the Jitsi Meet deployment to be proxy to in the context of
  * development with webpack-dev-server.
@@ -87,7 +85,7 @@ const config = {
         }, {
             // Expose jquery as the globals $ and jQuery because it is expected
             // to be available in such a form by multiple jitsi-meet
-            // dependencies including AUI, lib-jitsi-meet.
+            // dependencies including lib-jitsi-meet.
 
             loader: 'expose-loader?$!expose-loader?jQuery',
             test: /\/node_modules\/jquery\/.*\.js$/
@@ -104,17 +102,6 @@ const config = {
                 'style-loader',
                 'css-loader'
             ]
-        }, {
-            // Emit the static assets of AUI such as images that are referenced
-            // by CSS into the output path.
-
-            include: auiCSS,
-            loader: 'file-loader',
-            options: {
-                context: auiCSS,
-                name: '[path][name].[ext]'
-            },
-            test: /\.(gif|png|svg)$/
         } ]
     },
     node: {
@@ -152,8 +139,9 @@ module.exports = [
         entry: {
             'app.bundle': [
 
-                // XXX Required by at least IE11 at the time of this writing.
+                // babel-polyfill and fetch polyfill are required for IE11.
                 'babel-polyfill',
+                'whatwg-fetch',
                 './app.js'
             ],
 
@@ -162,6 +150,18 @@ module.exports = [
 
             'alwaysontop':
                 './react/features/always-on-top/index.js',
+
+            'dial_in_info_bundle': [
+
+                // babel-polyfill and fetch polyfill are required for IE11.
+                'babel-polyfill',
+                'whatwg-fetch',
+
+                // atlaskit does not support React 16 prop-types
+                './react/features/base/react/prop-types-polyfill.js',
+
+                './react/features/invite/components/dial-in-info-page'
+            ],
 
             'do_external_connect':
                 './connection_optimization/do_external_connect.js'

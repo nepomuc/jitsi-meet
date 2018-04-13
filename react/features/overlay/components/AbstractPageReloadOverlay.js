@@ -4,6 +4,10 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 
 import {
+    createPageReloadScheduledEvent,
+    sendAnalytics
+} from '../../analytics';
+import {
     isFatalJitsiConferenceError,
     isFatalJitsiConnectionError
 } from '../../base/lib-jitsi-meet';
@@ -26,6 +30,15 @@ export default class AbstractPageReloadOverlay extends Component<*, *> {
      * @static
      */
     static propTypes = {
+        /**
+         * The details is an object containing more information about the
+         * connection failed (shard changes, was the computer suspended, etc.)
+         *
+         * @public
+         * @type {object}
+         */
+        details: PropTypes.object,
+
         dispatch: PropTypes.func,
 
         /**
@@ -65,13 +78,14 @@ export default class AbstractPageReloadOverlay extends Component<*, *> {
      */
     static needsRender(state) {
         const conferenceError = state['features/base/conference'].error;
+        const configError = state['features/base/config'].error;
         const connectionError = state['features/base/connection'].error;
 
         return (
             (connectionError && isFatalJitsiConnectionError(connectionError))
                 || (conferenceError
                     && isFatalJitsiConferenceError(conferenceError))
-        );
+                || configError);
     }
 
     _interval: ?number
@@ -155,10 +169,20 @@ export default class AbstractPageReloadOverlay extends Component<*, *> {
         // because the log queue is not flushed before "fabric terminated" is
         // sent to the backed.
         // FIXME: We should dispatch action for this.
-        APP.conference.logEvent(
-            'page.reload',
-            /* value */ undefined,
-            /* label */ this.props.reason);
+        if (typeof APP !== 'undefined') {
+            if (APP.conference && APP.conference._room) {
+                APP.conference._room.sendApplicationLog(JSON.stringify({
+                    name: 'page.reload',
+                    label: this.props.reason
+                }));
+            }
+        }
+
+        sendAnalytics(createPageReloadScheduledEvent(
+            this.props.reason,
+            this.state.timeoutSeconds,
+            this.props.details));
+
         logger.info(
             `The conference will be reloaded after ${
                 this.state.timeoutSeconds} seconds.`);
@@ -243,16 +267,19 @@ export default class AbstractPageReloadOverlay extends Component<*, *> {
  * @param {Object} state - The redux state.
  * @protected
  * @returns {{
+ *     details: Object,
  *     isNetworkFailure: boolean,
  *     reason: string
  * }}
  */
 export function abstractMapStateToProps(state: Object) {
-    const conferenceError = state['features/base/conference'].error;
-    const connectionError = state['features/base/connection'].error;
+    const { error: conferenceError } = state['features/base/conference'];
+    const { error: configError } = state['features/base/config'];
+    const { error: connectionError } = state['features/base/connection'];
 
     return {
-        isNetworkFailure: Boolean(connectionError),
-        reason: (connectionError || conferenceError).message
+        details: connectionError ? connectionError.details : undefined,
+        isNetworkFailure: Boolean(configError || connectionError),
+        reason: (configError || connectionError || conferenceError).message
     };
 }

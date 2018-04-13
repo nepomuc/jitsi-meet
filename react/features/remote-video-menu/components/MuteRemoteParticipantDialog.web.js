@@ -5,7 +5,10 @@ import { connect } from 'react-redux';
 import { Dialog } from '../../base/dialog';
 import { translate } from '../../base/i18n';
 
-import { sendAnalyticsEvent } from '../../analytics';
+import {
+    createRemoteMuteConfirmedEvent,
+    sendAnalytics
+} from '../../analytics';
 import { muteRemoteParticipant } from '../../base/participants';
 
 /**
@@ -74,18 +77,12 @@ class MuteRemoteParticipantDialog extends Component {
      * Handles the submit button action.
      *
      * @private
-     * @returns {void}
+     * @returns {boolean} - True (to note that the modal should be closed).
      */
     _onSubmit() {
         const { dispatch, participantID } = this.props;
 
-        sendAnalyticsEvent(
-            'remotevideomenu.mute.confirmed',
-            {
-                value: 1,
-                label: participantID
-            }
-        );
+        sendAnalytics(createRemoteMuteConfirmedEvent(participantID));
 
         dispatch(muteRemoteParticipant(participantID));
 

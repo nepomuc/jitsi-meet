@@ -3,8 +3,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 
-import { CallOverlay } from '../../base/jwt';
-
 import PageReloadFilmstripOnlyOverlay from './PageReloadFilmstripOnlyOverlay';
 import PageReloadOverlay from './PageReloadOverlay';
 import SuspendedFilmstripOnlyOverlay from './SuspendedFilmstripOnlyOverlay';
@@ -93,11 +91,16 @@ function _getOverlays(filmstripOnly) {
         }
     } else if (!(overlays = _nonFilmstripOnlyOverlays)) {
         overlays = _nonFilmstripOnlyOverlays = [
-            PageReloadOverlay,
-            SuspendedOverlay,
-            UserMediaPermissionsOverlay,
-            CallOverlay
+            PageReloadOverlay
         ];
+
+        // Mobile only has a PageReloadOverlay.
+        if (navigator.product !== 'ReactNative') {
+            overlays.push(...[
+                SuspendedOverlay,
+                UserMediaPermissionsOverlay
+            ]);
+        }
     }
 
     return overlays;

@@ -3,7 +3,10 @@ import UIUtil from '../../util/UIUtil';
 import UIEvents from '../../../../service/UI/UIEvents';
 import Settings from '../../../settings/Settings';
 
-import { sendAnalyticsEvent } from '../../../../react/features/analytics';
+import {
+    createProfilePanelButtonEvent,
+    sendAnalytics
+} from '../../../../react/features/analytics';
 
 const sidePanelsContainerId = 'sideToolbarContainer';
 const htmlStr = `
@@ -91,7 +94,7 @@ export default {
          *
          */
         function loginClicked() {
-            sendAnalyticsEvent('authenticate.login.clicked');
+            sendAnalytics(createProfilePanelButtonEvent('login.button'));
             emitter.emit(UIEvents.AUTH_CLICKED);
         }
 
@@ -104,7 +107,7 @@ export default {
             const titleKey = 'dialog.logoutTitle';
             const msgKey = 'dialog.logoutQuestion';
 
-            sendAnalyticsEvent('authenticate.logout.clicked');
+            sendAnalytics(createProfilePanelButtonEvent('logout.button'));
 
             // Ask for confirmation
             APP.UI.messageHandler.openTwoButtonDialog({
@@ -136,14 +139,6 @@ export default {
      */
     changeDisplayName(newDisplayName) {
         $('#setDisplayName').val(newDisplayName);
-    },
-
-    /**
-     * Change user avatar in the settings menu.
-     * @param {string} avatarUrl url of the new avatar
-     */
-    changeAvatar(avatarUrl) {
-        $('#avatar').attr('src', avatarUrl);
     },
 
     /**

@@ -13,6 +13,7 @@ import {
 import { LOAD_CONFIG_ERROR } from '../../base/config';
 import { MiddlewareRegistry } from '../../base/redux';
 import { toURLString } from '../../base/util';
+import { ENTER_PICTURE_IN_PICTURE } from '../picture-in-picture';
 
 /**
  * Middleware that captures Redux actions and uses the ExternalAPI module to
@@ -51,6 +52,10 @@ MiddlewareRegistry.register(store => next => action => {
     case CONFERENCE_WILL_JOIN:
     case CONFERENCE_WILL_LEAVE:
         _sendConferenceEvent(store, action);
+        break;
+
+    case ENTER_PICTURE_IN_PICTURE:
+        _sendEvent(store, _getSymbolDescription(action.type), /* data */ {});
         break;
 
     case LOAD_CONFIG_ERROR: {
@@ -120,11 +125,13 @@ function _getSymbolDescription(symbol: Symbol) {
  */
 function _sendConferenceEvent(
         store: Object,
-        { conference, type, ...data }: {
+        action: {
             conference: Object,
             type: Symbol,
             url: ?string
         }) {
+    const { conference, type, ...data } = action;
+
     // For these (redux) actions, conference identifies a JitsiConference
     // instance. The external API cannot transport such an object so we have to
     // transport an "equivalent".
@@ -132,7 +139,8 @@ function _sendConferenceEvent(
         data.url = toURLString(conference[JITSI_CONFERENCE_URL_KEY]);
     }
 
-    _sendEvent(store, _getSymbolDescription(type), data);
+    _swallowEvent(store, action, data)
+        || _sendEvent(store, _getSymbolDescription(type), data);
 }
 
 /**
@@ -162,5 +170,70 @@ function _sendEvent(
         if (externalAPIScope) {
             NativeModules.ExternalAPI.sendEvent(name, data, externalAPIScope);
         }
+    }
+}
+
+/**
+ * Determines whether to not send a {@code CONFERENCE_LEFT} event to the native
+ * counterpart of the External API.
+ *
+ * @param {Object} store - The redux store.
+ * @param {Action} action - The redux action which is causing the sending of the
+ * event.
+ * @param {Object} data - The details/specifics of the event to send determined
+ * by/associated with the specified {@code action}.
+ * @returns {boolean} If the specified event is to not be sent, {@code true};
+ * otherwise, {@code false}.
+ */
+function _swallowConferenceLeft({ getState }, action, { url }) {
+    // XXX Internally, we work with JitsiConference instances. Externally
+    // though, we deal with URL strings. The relation between the two is many to
+    // one so it's technically and practically possible (by externally loading
+    // the same URL string multiple times) to try to send CONFERENCE_LEFT
+    // externally for a URL string which identifies a JitsiConference that the
+    // app is internally legitimately working with.
+
+    if (url) {
+        const stateFeaturesBaseConference
+            = getState()['features/base/conference'];
+
+        // eslint-disable-next-line guard-for-in
+        for (const p in stateFeaturesBaseConference) {
+            const v = stateFeaturesBaseConference[p];
+
+            // Does the value of the base/conference's property look like a
+            // JitsiConference?
+            if (v && typeof v === 'object') {
+                const vURL = v[JITSI_CONFERENCE_URL_KEY];
+
+                if (vURL && vURL.toString() === url) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Determines whether to not send a specific event to the native counterpart of
+ * the External API.
+ *
+ * @param {Object} store - The redux store.
+ * @param {Action} action - The redux action which is causing the sending of the
+ * event.
+ * @param {Object} data - The details/specifics of the event to send determined
+ * by/associated with the specified {@code action}.
+ * @returns {boolean} If the specified event is to not be sent, {@code true};
+ * otherwise, {@code false}.
+ */
+function _swallowEvent(store, action, data) {
+    switch (action.type) {
+    case CONFERENCE_LEFT:
+        return _swallowConferenceLeft(store, action, data);
+
+    default:
+        return false;
     }
 }

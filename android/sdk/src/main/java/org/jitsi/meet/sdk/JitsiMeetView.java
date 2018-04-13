@@ -24,14 +24,19 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.util.Log;
 import android.widget.FrameLayout;
 
 import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.ReactRootView;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.common.LifecycleState;
 import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
+import com.rnimmersive.RNImmersiveModule;
 
 import java.net.URL;
 import java.util.Arrays;
@@ -49,6 +54,12 @@ public class JitsiMeetView extends FrameLayout {
     private static final int BACKGROUND_COLOR = 0xFF111111;
 
     /**
+     * The {@link Log} tag which identifies the source of the log messages of
+     * {@code JitsiMeetView}.
+     */
+    private final static String TAG = JitsiMeetView.class.getSimpleName();
+
+    /**
      * React Native bridge. The instance manager allows embedding applications
      * to create multiple root views off the same JavaScript bundle.
      */
@@ -64,7 +75,10 @@ public class JitsiMeetView extends FrameLayout {
             new AppInfoModule(reactContext),
             new AudioModeModule(reactContext),
             new ExternalAPIModule(reactContext),
-            new ProximityModule(reactContext)
+            new PictureInPictureModule(reactContext),
+            new ProximityModule(reactContext),
+            new WiFiStatsModule(reactContext),
+            new org.jitsi.meet.sdk.net.NAT64AddrInfoModule(reactContext)
         );
     }
 
@@ -81,6 +95,11 @@ public class JitsiMeetView extends FrameLayout {
         return null;
     }
 
+    // XXX Strictly internal use only (at the time of this writing)!
+    static ReactInstanceManager getReactInstanceManager() {
+        return reactInstanceManager;
+    }
+
     /**
      * Internal method to initialize the React Native instance manager. We
      * create a single instance in order to load the JavaScript bundle a single
@@ -95,13 +114,16 @@ public class JitsiMeetView extends FrameLayout {
                 .setApplication(application)
                 .setBundleAssetName("index.android.bundle")
                 .setJSMainModulePath("index.android")
+                .addPackage(new com.calendarevents.CalendarEventsPackage())
                 .addPackage(new com.corbt.keepawake.KCKeepAwakePackage())
                 .addPackage(new com.facebook.react.shell.MainReactPackage())
+                .addPackage(new com.i18n.reactnativei18n.ReactNativeI18n())
                 .addPackage(new com.oblador.vectoricons.VectorIconsPackage())
                 .addPackage(new com.ocetnik.timer.BackgroundTimerPackage())
                 .addPackage(new com.oney.WebRTCModule.WebRTCModulePackage())
                 .addPackage(new com.RNFetchBlob.RNFetchBlobPackage())
                 .addPackage(new com.rnimmersive.RNImmersivePackage())
+                .addPackage(new com.zmxv.RNSound.RNSoundPackage())
                 .addPackage(new ReactPackageAdapter() {
                     @Override
                     public List<NativeModule> createNativeModules(
@@ -236,6 +258,38 @@ public class JitsiMeetView extends FrameLayout {
     }
 
     /**
+     * Activity lifecycle method which should be called from
+     * {@code Activity.onUserLeaveHint} so we can do the required internal
+     * processing.
+     *
+     * This is currently not mandatory.
+     */
+    public static void onUserLeaveHint() {
+        sendEvent("onUserLeaveHint", null);
+    }
+
+    /**
+     * Helper function to send an event to JavaScript.
+     *
+     * @param eventName {@code String} containing the event name.
+     * @param params {@code WritableMap} optional ancillary data for the event.
+     */
+    private static void sendEvent(
+            String eventName,
+            @Nullable WritableMap params) {
+        if (reactInstanceManager != null) {
+            ReactContext reactContext
+                = reactInstanceManager.getCurrentReactContext();
+            if (reactContext != null) {
+                reactContext
+                    .getJSModule(
+                        DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                    .emit(eventName, params);
+            }
+        }
+    }
+
+    /**
      * The default base {@code URL} used to join a conference when a partial URL
      * (e.g. a room name only) is specified to {@link #loadURLString(String)} or
      * {@link #loadURLObject(Bundle)}.
@@ -255,6 +309,13 @@ public class JitsiMeetView extends FrameLayout {
      * Jitsi Meet.
      */
     private JitsiMeetViewListener listener;
+
+    /**
+     * Whether Picture-in-Picture is enabled. If {@code null}, defaults to
+     * {@code true} iff the Android platform supports Picture-in-Picture
+     * natively.
+     */
+    private Boolean pictureInPictureEnabled;
 
     /**
      * React Native root view.
@@ -321,6 +382,21 @@ public class JitsiMeetView extends FrameLayout {
     }
 
     /**
+     * Gets whether Picture-in-Picture is enabled. Picture-in-Picture is
+     * natively supported on Android API >= 26 (Oreo), so it should not be
+     * enabled on older platform versions.
+     *
+     * @return If Picture-in-Picture is enabled, {@code true}; {@code false},
+     * otherwise.
+     */
+    public boolean getPictureInPictureEnabled() {
+        return
+            PictureInPictureModule.isPictureInPictureSupported()
+                && (pictureInPictureEnabled == null
+                    || pictureInPictureEnabled.booleanValue());
+    }
+
+    /**
      * Gets whether the Welcome page is enabled. If {@code true}, the Welcome
      * page is rendered when this {@code JitsiMeetView} is not at a URL
      * identifying a Jitsi Meet conference/room.
@@ -361,12 +437,20 @@ public class JitsiMeetView extends FrameLayout {
         if (defaultURL != null) {
             props.putString("defaultURL", defaultURL.toString());
         }
+
         // externalAPIScope
         props.putString("externalAPIScope", externalAPIScope);
+
+        // pictureInPictureEnabled
+        props.putBoolean(
+            "pictureInPictureEnabled",
+            getPictureInPictureEnabled());
+
         // url
         if (urlObject != null) {
             props.putBundle("url", urlObject);
         }
+
         // welcomePageEnabled
         props.putBoolean("welcomePageEnabled", welcomePageEnabled);
 
@@ -384,7 +468,9 @@ public class JitsiMeetView extends FrameLayout {
         if (reactRootView == null) {
             reactRootView = new ReactRootView(getContext());
             reactRootView.startReactApplication(
-                reactInstanceManager, "App", props);
+                reactInstanceManager,
+                "App",
+                props);
             reactRootView.setBackgroundColor(BACKGROUND_COLOR);
             addView(reactRootView);
         } else {
@@ -413,6 +499,43 @@ public class JitsiMeetView extends FrameLayout {
     }
 
     /**
+     * Called when the window containing this view gains or loses focus.
+     *
+     * @param hasFocus If the window of this view now has focus, {@code true};
+     * otherwise, {@code false}.
+     */
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+
+        // https://github.com/mockingbot/react-native-immersive#restore-immersive-state
+
+        // FIXME The singleton pattern employed by RNImmersiveModule is not
+        // advisable because a react-native mobule is consumable only after its
+        // BaseJavaModule#initialize() has completed and here we have no
+        // knowledge of whether the precondition is really met.
+        RNImmersiveModule immersive = RNImmersiveModule.getInstance();
+
+        if (hasFocus && immersive != null) {
+            try {
+                immersive.emitImmersiveStateChangeEvent();
+            } catch (RuntimeException re) {
+                // FIXME I don't know how to check myself whether
+                // BaseJavaModule#initialize() has been invoked and thus
+                // RNImmersiveModule is consumable. A safe workaround is to
+                // swallow the failure because the whole full-screen/immersive
+                // functionality is brittle anyway, akin to the icing on the
+                // cake, and has been working without onWindowFocusChanged for a
+                // very long time.
+                Log.e(
+                    TAG,
+                    "RNImmersiveModule#emitImmersiveStateChangeEvent() failed!",
+                    re);
+            }
+        }
+    }
+
+    /**
      * Sets the default base {@code URL} used to join a conference when a
      * partial URL (e.g. a room name only) is specified to
      * {@link #loadURLString(String)} or {@link #loadURLObject(Bundle)}. Must be
@@ -434,6 +557,18 @@ public class JitsiMeetView extends FrameLayout {
      */
     public void setListener(JitsiMeetViewListener listener) {
         this.listener = listener;
+    }
+
+    /**
+     * Sets whether Picture-in-Picture is enabled. Because Picture-in-Picture is
+     * natively supported only since certain platform versions, specifying
+     * {@code true} will have no effect on unsupported platform versions.
+     *
+     * @param pictureInPictureEnabled To enable Picture-in-Picture,
+     * {@code true}; otherwise, {@code false}.
+     */
+    public void setPictureInPictureEnabled(boolean pictureInPictureEnabled) {
+        this.pictureInPictureEnabled = Boolean.valueOf(pictureInPictureEnabled);
     }
 
     /**

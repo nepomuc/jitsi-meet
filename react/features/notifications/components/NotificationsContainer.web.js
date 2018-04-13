@@ -5,6 +5,8 @@ import { connect } from 'react-redux';
 
 import { hideNotification } from '../actions';
 
+import { Notification } from './';
+
 /**
  * Implements a React {@link Component} which displays notifications and handles
  * automatic dismissmal after a notification is shown for a defined timeout
@@ -71,9 +73,7 @@ class NotificationsContainer extends Component {
         if (_notifications.length) {
             const notification = _notifications[0];
 
-            if (!_showNotifications) {
-                this._onDismissed(notification.uid);
-            } else if (this._notificationDismissTimeout) {
+            if (!_showNotifications || this._notificationDismissTimeout) {
 
                 // No-op because there should already be a notification that
                 // is waiting for dismissal.
@@ -144,7 +144,6 @@ class NotificationsContainer extends Component {
         }
 
         return _notifications.map(notification => {
-            const Notification = notification.component;
             const { props, uid } = notification;
 
             // The id attribute is necessary as {@code FlagGroup} looks for
@@ -185,7 +184,7 @@ function _mapStateToProps(state) {
     const isAnyOverlayVisible = (connectionEstablished && haveToReload)
         || isMediaPermissionPromptVisible
         || suspendDetected
-        || state['features/base/jwt'].callOverlayVisible;
+        || state['features/base/jwt'].calleeInfoVisible;
 
     const { enabled, notifications } = state['features/notifications'];
 

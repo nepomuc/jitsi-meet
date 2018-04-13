@@ -3,7 +3,10 @@ import md5 from 'js-md5';
 
 import { toState } from '../redux';
 
-import { DEFAULT_AVATAR_RELATIVE_PATH } from './constants';
+import {
+    DEFAULT_AVATAR_RELATIVE_PATH,
+    LOCAL_PARTICIPANT_DEFAULT_ID
+} from './constants';
 
 declare var config: Object;
 declare var interfaceConfig: Object;
@@ -75,6 +78,29 @@ export function getAvatarURL({ avatarID, avatarURL, email, id }: {
 }
 
 /**
+ * Returns the avatarURL for the participant associated with the passed in
+ * participant ID.
+ *
+ * @param {(Function|Object|Participant[])} stateful - The redux state
+ * features/base/participants, the (whole) redux state, or redux's
+ * {@code getState} function to be used to retrieve the state
+ * features/base/participants.
+ * @param {string} id - The ID of the participant to retrieve.
+ * @param {boolean} isLocal - An optional parameter indicating whether or not
+ * the partcipant id is for the local user. If true, a different logic flow is
+ * used find the local user, ignoring the id value as it can change through the
+ * beginning and end of a call.
+ * @returns {(string|undefined)}
+ */
+export function getAvatarURLByParticipantId(
+        stateful: Object | Function,
+        id: string = LOCAL_PARTICIPANT_DEFAULT_ID) {
+    const participant = getParticipantById(stateful, id);
+
+    return participant && getAvatarURL(participant);
+}
+
+/**
  * Returns local participant from Redux state.
  *
  * @param {(Function|Object|Participant[])} stateful - The redux state
@@ -122,6 +148,38 @@ export function getParticipantCount(stateful: Object | Function) {
     return getParticipants(stateful).length;
 }
 
+/**
+ * Returns participant's display name.
+ * FIXME: remove the hardcoded strings once interfaceConfig is stored in redux
+ * and merge with a similarly named method in conference.js.
+ *
+ * @param {(Function|Object)} stateful - The (whole) redux state, or redux's
+ * {@code getState} function to be used to retrieve the state.
+ * @param {string} id - The ID of the participant's display name to retrieve.
+ * @private
+ * @returns {string}
+ */
+export function getParticipantDisplayName(
+        stateful: Object | Function,
+        id: string) {
+    const participant = getParticipantById(stateful, id);
+
+    if (participant) {
+        if (participant.name) {
+            return participant.name;
+        }
+
+        if (participant.local) {
+            return typeof interfaceConfig === 'object'
+                ? interfaceConfig.DEFAULT_LOCAL_DISPLAY_NAME
+                : 'me';
+        }
+    }
+
+    return typeof interfaceConfig === 'object'
+        ? interfaceConfig.DEFAULT_REMOTE_DISPLAY_NAME
+        : 'Fellow Jitster';
+}
 
 /**
  * Selectors for getting all known participants with fake participants filtered

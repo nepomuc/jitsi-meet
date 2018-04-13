@@ -1,4 +1,7 @@
-/* global $ */
+/* global $, APP, interfaceConfig */
+
+import { setDocumentEditingState } from '../../../react/features/etherpad';
+import { getToolboxHeight } from '../../../react/features/toolbox';
 
 import VideoLayout from '../videolayout/VideoLayout';
 import LargeContainer from '../videolayout/LargeContainer';
@@ -123,8 +126,15 @@ class Etherpad extends LargeContainer {
      *
      */
     resize(containerWidth, containerHeight) {
-        const height = containerHeight - Filmstrip.getFilmstripHeight();
-        const width = containerWidth;
+        let height, width;
+
+        if (interfaceConfig.VERTICAL_FILMSTRIP) {
+            height = containerHeight - getToolboxHeight();
+            width = containerWidth - Filmstrip.getFilmstripWidth();
+        } else {
+            height = containerHeight - Filmstrip.getFilmstripHeight();
+            width = containerWidth;
+        }
 
         $(this.iframe)
             .width(width)
@@ -145,6 +155,9 @@ class Etherpad extends LargeContainer {
                 document.body.style.background = '#eeeeee';
                 $iframe.css({ visibility: 'visible' });
                 $container.css({ zIndex: 2 });
+
+                APP.store.dispatch(setDocumentEditingState(true));
+
                 resolve();
             });
         });
@@ -163,6 +176,9 @@ class Etherpad extends LargeContainer {
             $iframe.fadeOut(300, () => {
                 $iframe.css({ visibility: 'hidden' });
                 $container.css({ zIndex: 0 });
+
+                APP.store.dispatch(setDocumentEditingState(false));
+
                 resolve();
             });
         });
@@ -235,5 +251,7 @@ export default class EtherpadManager {
 
         this.eventEmitter
             .emit(UIEvents.TOGGLED_SHARED_DOCUMENT, !isVisible);
+
+        APP.store.dispatch(setDocumentEditingState(!isVisible));
     }
 }

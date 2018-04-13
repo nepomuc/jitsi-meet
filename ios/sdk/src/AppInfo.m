@@ -32,6 +32,12 @@ RCT_EXPORT_MODULE();
     NSString *name = infoDictionary[@"CFBundleDisplayName"];
     NSString *version = infoDictionary[@"CFBundleShortVersionString"];
 
+    if (name == nil) {
+        name = infoDictionary[@"CFBundleName"];
+        if (name == nil) {
+            name = @"";
+        }
+    }
     if (version == nil) {
         version = infoDictionary[@"CFBundleVersion"];
         if (version == nil) {
@@ -39,8 +45,11 @@ RCT_EXPORT_MODULE();
         }
     }
 
+    NSString *sdkBundlePath = [[NSBundle bundleForClass:self.class] bundlePath];
+
     return @{
         @"name": name,
+        @"sdkBundlePath": sdkBundlePath,
         @"version": version
     };
 };

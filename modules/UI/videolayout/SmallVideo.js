@@ -11,7 +11,8 @@ import { i18next } from '../../../react/features/base/i18n';
 import { AudioLevelIndicator }
     from '../../../react/features/audio-level-indicator';
 import {
-    Avatar as AvatarDisplay
+    Avatar as AvatarDisplay,
+    getAvatarURLByParticipantId
 } from '../../../react/features/base/participants';
 import {
     ConnectionIndicator
@@ -28,7 +29,6 @@ import {
 
 const logger = require('jitsi-meet-logger').getLogger(__filename);
 
-import Avatar from '../avatar/Avatar';
 import UIUtil from '../util/UIUtil';
 import UIEvents from '../../../service/UI/UIEvents';
 
@@ -590,7 +590,8 @@ SmallVideo.prototype.updateView = function() {
     if (!this.hasAvatar) {
         if (this.id) {
             // Init avatar
-            this.avatarChanged(Avatar.getAvatarUrl(this.id));
+            this.avatarChanged(
+                getAvatarURLByParticipantId(APP.store.getState(), this.id));
         } else {
             logger.error('Unable to init avatar - no id', this);
 
@@ -774,6 +775,10 @@ SmallVideo.prototype.initBrowserSpecificProperties = function() {
 SmallVideo.prototype.updateIndicators = function() {
     const indicatorToolbar
         = this.container.querySelector('.videocontainer__toptoolbar');
+
+    if (!indicatorToolbar) {
+        return;
+    }
 
     const iconSize = UIUtil.getIndicatorFontSize();
     const showConnectionIndicator = this.videoIsHovered

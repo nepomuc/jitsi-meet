@@ -67,15 +67,6 @@ const UIUtil = {
     },
 
     /**
-     * Plays the sound given by id.
-     *
-     * @param id the identifier of the audio element.
-     */
-    playSoundNotification(id) {
-        document.getElementById(id).play();
-    },
-
-    /**
      * Escapes the given text.
      */
     escapeHtml(unsafeText) {
@@ -217,6 +208,14 @@ const UIUtil = {
         }
     },
 
+    /**
+     * Redirects to a given URL.
+     *
+     * @param {string} url - The redirect URL.
+     * NOTE: Currently used to redirect to 3rd party location for
+     * authentication. In most cases redirectWithStoredParams action must be
+     * used instead of this method in order to preserve curent URL params.
+     */
     redirect(url) {
         window.location.href = url;
     },
@@ -228,43 +227,10 @@ const UIUtil = {
      * mode, {false} otherwise
      */
     isFullScreen() {
-        return document.fullscreenElement
+        return Boolean(document.fullscreenElement
             || document.mozFullScreenElement
             || document.webkitFullscreenElement
-            || document.msFullscreenElement;
-    },
-
-    /**
-     * Exits full screen mode.
-     * @see https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API
-     */
-    exitFullScreen() {
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
-        } else if (document.mozCancelFullScreen) {
-            document.mozCancelFullScreen();
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        }
-    },
-
-    /**
-     * Enter full screen mode.
-     * @see https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API
-     */
-    enterFullScreen() {
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.msRequestFullscreen) {
-            document.documentElement.msRequestFullscreen();
-        } else if (document.documentElement.mozRequestFullScreen) {
-            document.documentElement.mozRequestFullScreen();
-        } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement
-                .webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-        }
+            || document.msFullscreenElement);
     },
 
     /**

@@ -1,8 +1,8 @@
 // @flow
 
-import PropTypes from 'prop-types';
 import { Component } from 'react';
 
+import { createWelcomePageEvent, sendAnalytics } from '../../analytics';
 import { appNavigate } from '../../app';
 import { isRoomValid } from '../../base/conference';
 
@@ -12,6 +12,11 @@ import { generateRoomWithoutSeparator } from '../functions';
  * {@code AbstractWelcomePage}'s React {@code Component} prop types.
  */
 type Props = {
+
+    /**
+     * The user's profile.
+     */
+    _profile: Object,
     _room: string,
     dispatch: Dispatch<*>
 };
@@ -21,17 +26,7 @@ type Props = {
  *
  * @abstract
  */
-export class AbstractWelcomePage extends Component<*, *> {
-    /**
-     * {@code AbstractWelcomePage}'s React {@code Component} prop types.
-     *
-     * @static
-     */
-    static propTypes = {
-        _room: PropTypes.string,
-        dispatch: PropTypes.func
-    };
-
+export class AbstractWelcomePage extends Component<Props, *> {
     _mounted: ?boolean;
 
     /**
@@ -169,6 +164,12 @@ export class AbstractWelcomePage extends Component<*, *> {
     _onJoin() {
         const room = this.state.room || this.state.generatedRoomname;
 
+        sendAnalytics(
+            createWelcomePageEvent('clicked', 'joinButton', {
+                isGenerated: !this.state.room,
+                room
+            }));
+
         if (room) {
             this.setState({ joining: true });
 
@@ -228,11 +229,13 @@ export class AbstractWelcomePage extends Component<*, *> {
  * @param {Object} state - The redux state.
  * @protected
  * @returns {{
+ *     _profile: Object,
  *     _room: string
  * }}
  */
 export function _mapStateToProps(state: Object) {
     return {
+        _profile: state['features/base/profile'],
         _room: state['features/base/conference'].room
     };
 }

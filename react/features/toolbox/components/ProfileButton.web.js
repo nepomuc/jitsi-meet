@@ -4,8 +4,14 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 
-import { sendAnalyticsEvent } from '../../analytics';
-import { DEFAULT_AVATAR_RELATIVE_PATH } from '../../base/participants';
+import {
+    createToolbarEvent,
+    sendAnalytics
+} from '../../analytics';
+import {
+    getAvatarURL,
+    getLocalParticipant
+} from '../../base/participants';
 import UIEvents from '../../../../service/UI/UIEvents';
 
 import ToolbarButton from './ToolbarButton';
@@ -39,6 +45,11 @@ class ProfileButton extends Component<*> {
      * @static
      */
     static propTypes = {
+        /**
+         * The redux representation of the local participant.
+         */
+        _localParticipant: PropTypes.object,
+
         /**
          * Whether the button support clicking or not.
          */
@@ -76,7 +87,12 @@ class ProfileButton extends Component<*> {
      * @returns {ReactElement}
      */
     render() {
-        const { _unclickable, tooltipPosition, toggled } = this.props;
+        const {
+            _localParticipant,
+            _unclickable,
+            tooltipPosition,
+            toggled
+        } = this.props;
         const buttonConfiguration = {
             ...DEFAULT_BUTTON_CONFIGURATION,
             unclickable: _unclickable,
@@ -90,7 +106,7 @@ class ProfileButton extends Component<*> {
                 tooltipPosition = { tooltipPosition }>
                 <img
                     id = 'avatar'
-                    src = { DEFAULT_AVATAR_RELATIVE_PATH } />
+                    src = { getAvatarURL(_localParticipant) } />
             </ToolbarButton>
         );
     }
@@ -102,7 +118,9 @@ class ProfileButton extends Component<*> {
      */
     _onClick() {
         if (!this.props._unclickable) {
-            sendAnalyticsEvent('toolbar.profile.toggled');
+            // TODO: Include an 'enable' attribute, which specifies whether
+            // the profile panel was opened or closed.
+            sendAnalytics(createToolbarEvent('profile'));
             APP.UI.emitEvent(UIEvents.TOGGLE_PROFILE);
         }
     }
@@ -115,11 +133,13 @@ class ProfileButton extends Component<*> {
  * @param {Object} state - The Redux state.
  * @private
  * @returns {{
+ *     _localParticipant: Object,
  *     _unclickable: boolean
  * }}
  */
 function _mapStateToProps(state) {
     return {
+        _localParticipant: getLocalParticipant(state),
         _unclickable: !state['features/base/jwt'].isGuest
     };
 }

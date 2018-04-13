@@ -24,6 +24,7 @@ var interfaceConfig = {
     BRAND_WATERMARK_LINK: '',
     SHOW_POWERED_BY: false,
     GENERATE_ROOMNAMES_ON_WELCOME_PAGE: true,
+    DISPLAY_WELCOME_PAGE_CONTENT: true,
     APP_NAME: 'Jitsi Meet',
     LANG_DETECTION: false, // Allow i18n to detect the system language
     INVITATION_POWERED_BY: true,
@@ -40,25 +41,21 @@ var interfaceConfig = {
     TOOLBAR_BUTTONS: [
 
         // main toolbar
-        'microphone', 'camera', 'desktop', 'invite', 'fullscreen', 'fodeviceselection', 'hangup',
+        'microphone', 'camera', 'desktop', 'fullscreen', 'fodeviceselection', 'hangup',
 
         // extended toolbar
-        'profile', 'contacts', 'info', 'chat', 'recording', 'etherpad', 'sharedvideo', 'settings', 'raisehand', 'videoquality', 'filmstrip' ],
+        'profile', 'info', 'chat', 'recording', 'etherpad',
+        'sharedvideo', 'settings', 'raisehand', 'videoquality', 'filmstrip',
+        'invite', 'feedback', 'stats', 'shortcuts'
+    ],
 
-    /**
-     * Main Toolbar Buttons
-     * All of them should be in TOOLBAR_BUTTONS
-     */
-    MAIN_TOOLBAR_BUTTONS: [ 'microphone', 'camera', 'desktop', 'invite', 'fullscreen', 'fodeviceselection', 'hangup' ],
     SETTINGS_SECTIONS: [ 'language', 'devices', 'moderator' ],
-    INVITE_OPTIONS: [ 'invite', 'dialout', 'addtocall' ],
 
     // Determines how the video would fit the screen. 'both' would fit the whole
     // screen, 'height' would fit the original video height to the height of the
     // screen, 'width' would fit the original video width to the width of the
     // screen respecting ratio.
     VIDEO_LAYOUT_FIT: 'both',
-    SHOW_CONTACTLIST_AVATARS: true,
 
     /**
      * Whether to only show the filmstrip (and hide the toolbar).
@@ -150,6 +147,21 @@ var interfaceConfig = {
      * @type {boolean}
      */
     VIDEO_QUALITY_LABEL_DISABLED: false
+
+    /**
+     * Specify custom URL for downloading android mobile app.
+     */
+    // MOBILE_DOWNLOAD_LINK_ANDROID: 'https://play.google.com/store/apps/details?id=org.jitsi.meet',
+
+    /**
+     * Specify URL for downloading ios mobile app.
+     */
+    // MOBILE_DOWNLOAD_LINK_IOS: 'https://itunes.apple.com/us/app/jitsi-meet/id1165103905',
+
+    /**
+     * Specify mobile app scheme for opening the app from the mobile browser.
+     */
+    // MOBILE_APP_SCHEME: 'org.jitsi.meet'
 };
 
 /* eslint-enable no-unused-vars, no-var, max-len */

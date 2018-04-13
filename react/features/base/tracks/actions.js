@@ -1,4 +1,7 @@
-import { sendAnalyticsEvent } from '../../analytics';
+import {
+    createTrackMutedEvent,
+    sendAnalytics
+} from '../../analytics';
 import { JitsiTrackErrors, JitsiTrackEvents } from '../lib-jitsi-meet';
 import {
     CAMERA_FACING_MODE,
@@ -9,6 +12,7 @@ import {
 import { getLocalParticipant } from '../participants';
 
 import {
+    TOGGLE_SCREENSHARING,
     TRACK_ADDED,
     TRACK_CREATE_CANCELED,
     TRACK_CREATE_ERROR,
@@ -16,7 +20,7 @@ import {
     TRACK_UPDATED,
     TRACK_WILL_CREATE
 } from './actionTypes';
-import { createLocalTracksF } from './functions';
+import { createLocalTracksF, getLocalTrack, getLocalTracks } from './functions';
 
 const logger = require('jitsi-meet-logger').getLogger(__filename);
 
@@ -41,8 +45,9 @@ export function createDesiredLocalTracks(...desiredTypes) {
         }
 
         const availableTypes
-            = state['features/base/tracks']
-                .filter(t => t.local)
+            = getLocalTracks(
+                    state['features/base/tracks'],
+                    /* includePending */ true)
                 .map(t => t.mediaType);
 
         // We need to create the desired tracks which are not already available.
@@ -81,8 +86,10 @@ export function createLocalTracksA(options = {}) {
         // to implement them) and the right thing to do is to ask for each
         // device separately.
         for (const device of devices) {
-            if (getState()['features/base/tracks']
-                    .find(t => t.local && t.mediaType === device)) {
+            if (getLocalTrack(
+                    getState()['features/base/tracks'],
+                    device,
+                    /* includePending */ true)) {
                 throw new Error(`Local track for ${device} already exists`);
             }
 
@@ -170,6 +177,20 @@ export function destroyLocalTracks() {
 }
 
 /**
+ * Signals that the local participant is ending screensharing or beginning the
+ * screensharing flow.
+ *
+ * @returns {{
+ *     type: TOGGLE_SCREENSHARING,
+ * }}
+ */
+export function toggleScreensharing() {
+    return {
+        type: TOGGLE_SCREENSHARING
+    };
+}
+
+/**
  * Replaces one track with another for one renegotiation instead of invoking
  * two renegotiations with a separate removeTrack and addTrack. Disposes the
  * removed track as well.
@@ -217,9 +238,10 @@ export function replaceLocalTrack(oldTrack, newTrack, conference) {
                                     : setAudioMuted;
                             const isMuted = newTrack.isMuted();
 
-                            sendAnalyticsEvent(`replacetrack.${
-                                newTrack.getType()}.${
-                                isMuted ? 'muted' : 'unmuted'}`);
+                            sendAnalytics(createTrackMutedEvent(
+                                newTrack.getType(),
+                                'track.replaced',
+                                isMuted));
                             logger.log(`Replace ${newTrack.getType()} track - ${
                                 isMuted ? 'muted' : 'unmuted'}`);
 

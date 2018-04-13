@@ -23,6 +23,8 @@ import org.jitsi.meet.sdk.JitsiMeetActivity;
 import org.jitsi.meet.sdk.JitsiMeetView;
 import org.jitsi.meet.sdk.JitsiMeetViewListener;
 
+import com.calendarevents.CalendarEventsPackage;
+
 import java.util.Map;
 
 /**
@@ -95,11 +97,18 @@ public class MainActivity extends JitsiMeetActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // As this is the Jitsi Meet app (i.e. not the Jitsi Meet SDK), we do
-        // want the Welcome page to be enabled. It defaults to disabled in the
-        // SDK at the time of this writing but it is clearer to be explicit
-        // about what we want anyway.
+        // want to enable some options.
+
+        // The welcome page defaults to disabled in the SDK at the time of this
+        // writing but it is clearer to be explicit about what we want anyway.
         setWelcomePageEnabled(true);
 
         super.onCreate(savedInstanceState);
     }
+
+    @Override
+  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+      CalendarEventsPackage.onRequestPermissionsResult(requestCode, permissions, grantResults);
+      super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+  }
 }

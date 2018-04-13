@@ -1,9 +1,14 @@
 /* @flow */
 
-import { sendAnalyticsEvent } from '../../analytics';
+import {
+    createStartAudioOnlyEvent,
+    createStartMutedConfigurationEvent,
+    createSyncTrackStateEvent,
+    sendAnalytics
+} from '../../analytics';
 import { SET_ROOM, setAudioOnly } from '../conference';
-import { parseURLParams } from '../config';
 import JitsiMeetJS from '../lib-jitsi-meet';
+import { getPropertyValue } from '../profile';
 import { MiddlewareRegistry } from '../redux';
 import { setTrackMuted, TRACK_ADDED } from '../tracks';
 
@@ -55,41 +60,16 @@ function _setRoom({ dispatch, getState }, next, action) {
     // Read the config.
 
     const state = getState();
-    let urlParams;
-    let audioMuted;
-    let videoMuted;
 
-    if (room) {
-        // The Jitsi Meet client may override the Jitsi Meet deployment in the
-        // (location) URL on the subject of the following:
-        // - startAudioOnly
-        // - startWithAudioMuted
-        // - startWithVideoMuted
-        urlParams
-            = parseURLParams(state['features/base/connection'].locationURL);
+    const audioMuted = Boolean(getPropertyValue(state, 'startWithAudioMuted', {
+        ignoreUrlParams: !room
+    }));
+    const videoMuted = Boolean(getPropertyValue(state, 'startWithVideoMuted', {
+        ignoreUrlParams: !room
+    }));
 
-        audioMuted = urlParams['config.startWithAudioMuted'];
-        videoMuted = urlParams['config.startWithVideoMuted'];
-    }
-
-    // Of course, the Jitsi Meet deployment defines config.js which should be
-    // respected if the client did not override it.
-    const config = state['features/base/config'];
-
-    typeof audioMuted === 'undefined'
-        && (audioMuted = config.startWithAudioMuted);
-    typeof videoMuted === 'undefined'
-        && (videoMuted = config.startWithVideoMuted);
-
-    audioMuted = Boolean(audioMuted);
-    videoMuted = Boolean(videoMuted);
-
-    // Apply the config.
-
-    sendAnalyticsEvent(
-        `startmuted.client.audio.${audioMuted ? 'muted' : 'unmuted'}`);
-    sendAnalyticsEvent(
-        `startmuted.client.video.${videoMuted ? 'muted' : 'unmuted'}`);
+    sendAnalytics(createStartMutedConfigurationEvent(
+        'local', audioMuted, videoMuted));
 
     logger.log(`Start muted: ${audioMuted ? 'audio, ' : ''}${
         videoMuted ? 'video' : ''}`);
@@ -112,18 +92,14 @@ function _setRoom({ dispatch, getState }, next, action) {
         let audioOnly;
 
         if (JitsiMeetJS.mediaDevices.supportsVideo()) {
-            audioOnly = urlParams && urlParams['config.startAudioOnly'];
-            typeof audioOnly === 'undefined'
-                && (audioOnly = config.startAudioOnly);
-            audioOnly = Boolean(audioOnly);
+            audioOnly = Boolean(getPropertyValue(state, 'startAudioOnly'));
         } else {
             // Always default to being audio only if the current environment
             // does not support sending or receiving video.
             audioOnly = true;
         }
 
-        sendAnalyticsEvent(
-            `startaudioonly.${audioOnly ? 'enabled' : 'disabled'}`);
+        sendAnalytics(createStartAudioOnlyEvent(audioOnly));
         logger.log(`Start audio only set to ${audioOnly.toString()}`);
         dispatch(setAudioOnly(audioOnly));
     }
@@ -149,8 +125,7 @@ function _syncTrackMutedState({ getState }, track) {
     // not yet in redux state and JitsiTrackEvents.TRACK_MUTE_CHANGED may be
     // fired before track gets to state.
     if (track.muted !== muted) {
-        sendAnalyticsEvent(
-            `synctrackstate.${track.mediaType}.${muted ? 'muted' : 'unmuted'}`);
+        sendAnalytics(createSyncTrackStateEvent(track.mediaType, muted));
         logger.log(`Sync ${track.mediaType} track muted state to ${
             muted ? 'muted' : 'unmuted'}`);
         track.muted = muted;

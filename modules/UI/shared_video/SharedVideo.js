@@ -1,4 +1,6 @@
-/* global $, APP, YT, onPlayerReady, onPlayerStateChange, onPlayerError */
+/* global $, APP, YT, interfaceConfig, onPlayerReady, onPlayerStateChange,
+onPlayerError */
+
 const logger = require('jitsi-meet-logger').getLogger(__filename);
 
 import UIUtil from '../util/UIUtil';
@@ -8,12 +10,19 @@ import VideoLayout from '../videolayout/VideoLayout';
 import LargeContainer from '../videolayout/LargeContainer';
 import Filmstrip from '../videolayout/Filmstrip';
 
-import { sendAnalyticsEvent } from '../../../react/features/analytics';
+import {
+    createSharedVideoEvent as createEvent,
+    sendAnalytics
+} from '../../../react/features/analytics';
 import {
     participantJoined,
     participantLeft
 } from '../../../react/features/base/participants';
-import { dockToolbox, showToolbox } from '../../../react/features/toolbox';
+import {
+    dockToolbox,
+    getToolboxHeight,
+    showToolbox
+} from '../../../react/features/toolbox';
 
 import SharedVideoThumb from './SharedVideoThumb';
 
@@ -83,11 +92,11 @@ export default class SharedVideoManager {
                     url => {
                         this.emitter.emit(
                             UIEvents.UPDATE_SHARED_VIDEO, url, 'start');
-                        sendAnalyticsEvent('sharedvideo.started');
+                        sendAnalytics(createEvent('started'));
                     },
                     err => {
                         logger.log('SHARED VIDEO CANCELED', err);
-                        sendAnalyticsEvent('sharedvideo.canceled');
+                        sendAnalytics(createEvent('canceled'));
                     }
             );
 
@@ -107,7 +116,7 @@ export default class SharedVideoManager {
                     }
                     this.emitter.emit(
                         UIEvents.UPDATE_SHARED_VIDEO, this.url, 'stop');
-                    sendAnalyticsEvent('sharedvideo.stoped');
+                    sendAnalytics(createEvent('stopped'));
                 },
                 () => {}); // eslint-disable-line no-empty-function
         } else {
@@ -115,7 +124,7 @@ export default class SharedVideoManager {
                 descriptionKey: 'dialog.alreadySharedVideoMsg',
                 titleKey: 'dialog.alreadySharedVideoTitle'
             });
-            sendAnalyticsEvent('sharedvideo.alreadyshared');
+            sendAnalytics(createEvent('already.shared'));
         }
     }
 
@@ -224,7 +233,7 @@ export default class SharedVideoManager {
                 // eslint-disable-next-line eqeqeq
             } else if (event.data == YT.PlayerState.PAUSED) {
                 self.smartAudioUnmute();
-                sendAnalyticsEvent('sharedvideo.paused');
+                sendAnalytics(createEvent('paused'));
             }
             // eslint-disable-next-line eqeqeq
             self.fireSharedVideoEvent(event.data == YT.PlayerState.PAUSED);
@@ -256,7 +265,12 @@ export default class SharedVideoManager {
             } else if (event.data.volume <= 0 || event.data.muted) {
                 self.smartAudioUnmute();
             }
-            sendAnalyticsEvent('sharedvideo.volumechanged');
+            sendAnalytics(createEvent(
+                'volume.changed',
+                {
+                    volume: event.data.volume,
+                    muted: event.data.muted
+                }));
         };
 
         window.onPlayerReady = function(event) {
@@ -272,6 +286,7 @@ export default class SharedVideoManager {
 
             thumb.setDisplayName('YouTube');
             VideoLayout.addRemoteVideoContainer(self.url, thumb);
+            VideoLayout.resizeThumbnails(true);
 
             const iframe = player.getIframe();
 
@@ -349,7 +364,6 @@ export default class SharedVideoManager {
 
                 player.setVolume(attributes.volume);
                 logger.info(`Player change of volume:${attributes.volume}`);
-                this.showSharedVideoMutedPopup(false);
             }
 
             if (isPlayerPaused) {
@@ -422,8 +436,8 @@ export default class SharedVideoManager {
     }
 
     /**
-     * Updates video, if its not playing and needs starting or
-     * if its playing and needs to be paysed
+     * Updates video, if it's not playing and needs starting or if it's playing
+     * and needs to be paused.
      * @param id the id of the sender of the command
      * @param url the video url
      * @param attributes
@@ -549,8 +563,6 @@ export default class SharedVideoManager {
                 this.smartAudioMute();
             }
         }
-
-        this.showSharedVideoMutedPopup(mute);
     }
 
     /**
@@ -562,10 +574,9 @@ export default class SharedVideoManager {
         if (APP.conference.isLocalAudioMuted()
             && !this.mutedWithUserInteraction
             && !this.isSharedVideoVolumeOn()) {
-            sendAnalyticsEvent('sharedvideo.audio.unmuted');
+            sendAnalytics(createEvent('audio.unmuted'));
             logger.log('Shared video: audio unmuted');
             this.emitter.emit(UIEvents.AUDIO_MUTED, false, false);
-            this.showMicMutedPopup(false);
         }
     }
 
@@ -576,40 +587,10 @@ export default class SharedVideoManager {
     smartAudioMute() {
         if (!APP.conference.isLocalAudioMuted()
             && this.isSharedVideoVolumeOn()) {
-            sendAnalyticsEvent('sharedvideo.audio.muted');
+            sendAnalytics(createEvent('audio.muted'));
             logger.log('Shared video: audio muted');
             this.emitter.emit(UIEvents.AUDIO_MUTED, true, false);
-            this.showMicMutedPopup(true);
         }
-    }
-
-    /**
-     * Shows a popup under the microphone toolbar icon that notifies the user
-     * of automatic mute after a shared video has started.
-     * @param show boolean, show or hide the notification
-     */
-    showMicMutedPopup(show) {
-        if (show) {
-            this.showSharedVideoMutedPopup(false);
-        }
-
-        APP.UI.showCustomToolbarPopup(
-            'microphone', 'micMutedPopup', show, 5000);
-    }
-
-    /**
-     * Shows a popup under the shared video toolbar icon that notifies the user
-     * of automatic mute of the shared video after the user has unmuted their
-     * mic.
-     * @param show boolean, show or hide the notification
-     */
-    showSharedVideoMutedPopup(show) {
-        if (show) {
-            this.showMicMutedPopup(false);
-        }
-
-        APP.UI.showCustomToolbarPopup(
-            'sharedvideo', 'sharedVideoMutedPopup', show, 5000);
     }
 }
 
@@ -681,9 +662,15 @@ class SharedVideoContainer extends LargeContainer {
      *
      */
     resize(containerWidth, containerHeight) {
-        const height = containerHeight - Filmstrip.getFilmstripHeight();
+        let height, width;
 
-        const width = containerWidth;
+        if (interfaceConfig.VERTICAL_FILMSTRIP) {
+            height = containerHeight - getToolboxHeight();
+            width = containerWidth - Filmstrip.getFilmstripWidth();
+        } else {
+            height = containerHeight - Filmstrip.getFilmstripHeight();
+            width = containerWidth;
+        }
 
         this.$iframe.width(width).height(height);
     }

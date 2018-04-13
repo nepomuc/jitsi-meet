@@ -3,7 +3,7 @@
 import _ from 'lodash';
 import type { Dispatch } from 'redux';
 
-import { conferenceWillLeave } from '../conference';
+import { conferenceLeft, conferenceWillLeave } from '../conference';
 import JitsiMeetJS, { JitsiConnectionEvents } from '../lib-jitsi-meet';
 import { parseStandardURIString } from '../util';
 
@@ -177,6 +177,7 @@ export function connectionEstablished(connection: Object) {
  * @param {string} [message] - Error message.
  * @param {Object} [credentials] - The invalid credentials that failed
  * the authentication.
+ * @param {Object} [details] - The details about the connection failed event.
  * @public
  * @returns {{
  *     type: CONNECTION_FAILED,
@@ -188,7 +189,8 @@ export function connectionFailed(
         connection: Object,
         error: string,
         message: ?string,
-        credentials: ?Object) {
+        credentials: ?Object,
+        details: ?Object) {
     return {
         type: CONNECTION_FAILED,
         connection,
@@ -201,7 +203,8 @@ export function connectionFailed(
                     ? credentials
                     : undefined,
             message,
-            name: error
+            name: error,
+            details
         }
     };
 }
@@ -278,7 +281,16 @@ export function disconnect() {
             // intention to leave the conference.
             dispatch(conferenceWillLeave(conference_));
 
-            promise = conference_.leave();
+            promise
+                = conference_.leave()
+                    .catch(() => {
+                        // The library lib-jitsi-meet failed to make the
+                        // JitsiConference leave. Which may be because
+                        // JitsiConference thinks it has already left.
+                        // Regardless of the failure reason, continue in
+                        // jitsi-meet as if the leave has succeeded.
+                        dispatch(conferenceLeft(conference_));
+                    });
         } else {
             promise = Promise.resolve();
         }

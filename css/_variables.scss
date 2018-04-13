@@ -36,6 +36,12 @@ $alwaysOnTopToolbarFontSize: 1em;
 $alwaysOnTopToolbarSize: 30px;
 $defaultToolbarSize: 50px;
 $defaultFilmStripOnlyToolbarSize: 37px;
+$newToolbarBackgroundColor: rgba(22, 38, 55, 0.8);
+$newToolbarButtonHoverColor: rgba(14, 20, 35, 0.6);
+$newToolbarButtonToggleColor: rgba(14, 20, 35, 1);
+$newToolbarFontSize: 1.9em;
+$newToolbarSize: 56px;
+$newToolbarSizeWithPadding: calc(56px + 32px);
 $secToolbarFontSize: 1.9em;
 $secToolbarLineHeight: 45px;
 $toolbarAvatarPadding: 10px;
@@ -74,10 +80,6 @@ $feedbackInputBg: #fff;
 $feedbackTextColor: #000;
 $feedbackInputTextColor: #333;
 $feedbackInputPlaceholderColor: #777;
-$rateStarLabelColor: #333;
-$rateStarDefault: #ccc;
-$rateStarActivity: #165ecc;
-$rateStarSize: 34px;
 
 /**
  * Modals
@@ -138,8 +140,8 @@ $formPadding: 16px;
 /**
  * Unsupported browser
  */
-$primaryUnsupportedBrowserButtonBgColor: #17a0db;
-$unsupportedBrowserButtonBgColor: #ff9a00;
+$primaryUnsupportedBrowserButtonBgColor: #0052CC;
+$unsupportedBrowserButtonBgColor: rgba(9, 30, 66, 0.04);
 $unsupportedBrowserTextColor: #4a4a4a;
 $unsupportedBrowserTextSmallFontSize: 17px;
 $unsupportedBrowserTitleColor: #fff;
@@ -152,3 +154,11 @@ $unsupportedDesktopBrowserTextFontSize: 21px;
  */
 $watermarkWidth: 186px;
 $watermarkHeight: 74px;
+
+/**
+ * Welcome page variables.
+ */
+$welcomePageDescriptionColor: #fff;
+$welcomePageFontFamily: inherit;
+$welcomePageHeaderBackground: linear-gradient(#165ecc, #44A5FF);
+$welcomePageTitleColor: #fff;
